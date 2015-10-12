@@ -153,6 +153,13 @@ function init {
     fi
 }
 
+function dump_pass {
+    ENTRY=$(decrypt_stdout | grep "^${2}")
+    PASS=$(echo $ENTRY | cut -d, -f3)
+    PASS=$(decode $PASS)
+    echo $PASS
+}
+
 case $1 in
     add)
 	db_exists
@@ -160,6 +167,10 @@ case $1 in
 	;;
     init)
 	init
+	;;
+    pass)
+	db_exists
+	dump_pass $2
 	;;
     dump)
 	db_exists
