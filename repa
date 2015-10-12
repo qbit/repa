@@ -1,0 +1,174 @@
+#!/bin/sh
+
+VERSION=0.0.1
+
+function usage {
+    cat <<EOF
+${SNAME} ${VERSION} options:
+
+  -s [store_name] Use a named store instead of the default 'repa' store.
+  -h This information.
+
+  Examples:
+    Create a new repa store:
+    
+      repa init -s web_logins
+EOF
+    exit 0
+}
+
+while getopts "hs:" arg; do
+    case $arg in
+	h)
+	    usage
+	    ;;
+	s)
+	    STORE=$OPTARG
+	    ;;
+    esac
+done
+
+if [ -z $STORE ]; then
+    STORE="repa"
+fi
+
+SPATH=$(dirname -- "$(command -v -- "$0")")
+SNAME="${0##*/}"
+STORE_DIR=~/.repa
+REOP_OPTS="-p ${STORE_DIR}/${STORE}.pub -s ${STORE_DIR}/${STORE}.sec"
+REPA_DB="${STORE_DIR}/${STORE}.db"
+
+function error {
+    >&2 echo "${SNAME}: $1"
+    exit 1
+}
+
+function pp {
+    # Entry, Login, Password, Notes
+    E=$(echo $1 | cut -d, -f1)
+    L=$(echo $1 | cut -d, -f2)
+    P=$(echo $1 | cut -d, -f3)
+    N=$(echo $1 | cut -d, -f4)
+    
+    P=$(decode $P)
+    N=$(decode $N)
+    
+    echo "\nEntry: ${E}\nLogin: ${L}\nPassword: ${P}\nNotes: ${N}\n"
+}
+
+function encrypt {
+    SRC=$1
+    DEST=$2
+    
+    if [ ! -f $SRC ]; then
+	error "Can't encrypt nonexistent file! ${SRC}"
+    fi
+    echo "Encrypting ${SRC}"
+    reop -E -b $REOP_OPTS -m $SRC || error "Can't encrypt $SRC}"
+    
+    if [ ! -z $DEST ]; then
+	mv ${SRC}.enc ${DEST} || error "Can't move db to new location: ${SRC}.enc -> ${DEST}"
+    fi
+    
+    rm $SRC
+    
+}
+
+function decrypt_file {
+    $(reop -D $REOP_OPTS -x ${REPA_DB}.enc -m $1 || error "Can't decrypt ${REPA_DB}.enc!")
+}
+
+function decrypt_stdout {
+    o=$(reop -D $REOP_OPTS -x ${REPA_DB}.enc -m - || error "Can't decrypt ${REPA_DB}.enc!")
+    printf "$o"
+}
+
+function dump {
+    DB=$(decrypt_stdout)
+    OIFS=$IFS
+    IFS="
+"
+    for line in $DB; do
+	pp $line
+    done
+    IFS=$OIFS
+    echo
+}
+
+function encode {
+    echo $(echo $@ | perl -MMIME::Base64 -ne 'print encode_base64($_)')
+}
+
+function decode {
+    echo $(echo $@ | perl -MMIME::Base64 -ne 'print decode_base64($_)')
+}
+
+function add_entry {
+    echo -n "Entry: "
+    read ENTRY
+    echo -n "Login: "
+    read LOGIN
+    echo -n "Password: "
+    stty -echo
+    read -s PASS
+    stty echo
+    echo 
+    echo -n "Notes: "
+    read NOTES
+    
+    PASS=$(encode $PASS)
+    NOTES=$(encode $NOTES)
+    
+    entry="${ENTRY},${LOGIN},${PASS},${NOTES}"
+    
+    F=$(mktemp)
+    decrypt_file $F
+    echo $entry >> $F
+    encrypt $F ${REPA_DB}.enc
+}
+
+function db_exists {
+    if [ ! -f ${REPA_DB}.enc ]; then
+	error "DB ${REPA_DB}.enc doesn't exist! Plese run: '${SNAME} init'"
+    fi
+}
+
+function init {
+    if [ ! -d $STORE_DIR ]; then
+	mkdir $STORE_DIR
+	chmod 700 $STORE_DIR
+    fi
+    
+    if [ ! -f "${REPA_DB}.enc" ]; then
+		   
+	
+	echo "Generating new key pair."
+	reop -G ${REOP_OPTS} || error "Can't create key pair!"
+	echo "Creating store."
+	touch $REPA_DB || error "Can't create db file!"
+	encrypt $REPA_DB
+    else
+	echo "'${REPA_DB}.enc' already exists!"
+	exit 1
+    fi
+}
+
+case $1 in
+    add)
+	db_exists
+	add_entry
+	;;
+    init)
+	init
+	;;
+    dump)
+	db_exists
+	dump
+	;;
+    help)
+	usage
+	;;
+    *)
+	usage
+	;;
+esac
