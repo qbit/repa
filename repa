@@ -160,6 +160,11 @@ function dump_pass {
     echo $PASS
 }
 
+function dump_entry {
+    ENTRY=$(decrypt_stdout | grep "^${2}")
+    pp $ENTRY
+}
+
 case $1 in
     add)
 	db_exists
@@ -171,6 +176,10 @@ case $1 in
     pass)
 	db_exists
 	dump_pass $2
+	;;
+    show)
+	db_exists
+	dump_entry $2
 	;;
     dump)
 	db_exists
