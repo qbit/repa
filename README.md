@@ -21,14 +21,6 @@ repa add entry_name [-s [store_name]]
 
 Adds an entry named `entry_name` to `store_name` or `repa` if `store_name` is not specifieid.
 
-## repa find
-
-```
-repa find "string" [-s [store_name]]
-```
-
-Searches for "string" in either the default store, or a named store.
-
 ## repa show
 
 ```
@@ -39,6 +31,8 @@ Dumps a given `entry_name`, showing all information associated with a given entr
 
 ## repa gen
 
+*Not Implemented!*
+
 ```
 repa gen [-s [store_name]]
 ```
@@ -47,6 +41,8 @@ Generates a new random password, if `add_generated` is configured, this will fur
 
 ## repa edit
 
+*Not Implemented!*
+
 ```
 repa edit [-s [store_name]] entry_name
 ```
@@ -54,6 +50,8 @@ repa edit [-s [store_name]] entry_name
 Edit an existing entry.
 
 ## repa delete
+
+*Not Implemented!*
 
 ```
 repa delete [-s [store_name]] entry_name
