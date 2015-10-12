@@ -1,7 +1,7 @@
 repa
 ====
 
-A password management tool that uses reop to store credentials
+`repa` is password management tool that uses [reop](http://www.tedunangst.com/flak/post/reop) to store credentials
 
 # Usage
 
