@@ -2,7 +2,7 @@
 
 VERSION=0.0.1
 
-function usage {
+usage() {
     cat <<EOF
 ${SNAME} ${VERSION} options:
 
@@ -28,112 +28,111 @@ while getopts "hs:" arg; do
     esac
 done
 
-if [ -z $STORE ]; then
+if [ -z "$STORE" ]; then
     STORE="repa"
 fi
 
-SPATH=$(dirname -- "$(command -v -- "$0")")
 SNAME="${0##*/}"
 STORE_DIR=~/.repa
 REOP_OPTS="-p ${STORE_DIR}/${STORE}.pub -s ${STORE_DIR}/${STORE}.sec"
 REPA_DB="${STORE_DIR}/${STORE}.db"
 
-function error {
+error() {
     >&2 echo "${SNAME}: $1"
     exit 1
 }
 
-function pp {
+pp() {
     # Entry, Login, Password, Notes
-    E=$(echo $1 | cut -d, -f1)
-    L=$(echo $1 | cut -d, -f2)
-    P=$(echo $1 | cut -d, -f3)
-    N=$(echo $1 | cut -d, -f4)
+    E=$(echo "$1" | cut -d, -f1)
+    L=$(echo "$1" | cut -d, -f2)
+    P=$(echo "$1" | cut -d, -f3)
+    N=$(echo "$1" | cut -d, -f4)
     
-    P=$(decode $P)
-    N=$(decode $N)
+    P=$(decode "$P")
+    N=$(decode "$N")
     
-    echo "\nEntry: ${E}\nLogin: ${L}\nPassword: ${P}\nNotes: ${N}\n"
+    printf "\nEntry: %s\nLogin: %s\nPassword: %s\nNotes: %s\n" "$E" "$L" "$P" "$N"
 }
 
-function encrypt {
+encrypt() {
     SRC=$1
     DEST=$2
     
-    if [ ! -f $SRC ]; then
+    if [ ! -f "$SRC" ]; then
 	error "Can't encrypt nonexistent file! ${SRC}"
     fi
     echo "Encrypting ${SRC}"
-    reop -E -b $REOP_OPTS -m $SRC || error "Can't encrypt $SRC}"
+    reop -E -b $REOP_OPTS -m "$SRC" || error "Can't encrypt $SRC}"
     
-    if [ ! -z $DEST ]; then
-	mv ${SRC}.enc ${DEST} || error "Can't move db to new location: ${SRC}.enc -> ${DEST}"
+    if [ ! -z "$DEST" ]; then
+	mv "${SRC}.enc" "${DEST}" || error "Can't move db to new location: ${SRC}.enc -> ${DEST}"
     fi
     
-    rm $SRC
+    rm "$SRC"
     
 }
 
-function decrypt_file {
-    $(reop -D $REOP_OPTS -x ${REPA_DB}.enc -m $1 || error "Can't decrypt ${REPA_DB}.enc!")
+decrypt_file() {
+    reop -D $REOP_OPTS -x "${REPA_DB}.enc" -m "$1" || error "Can't decrypt ${REPA_DB}.enc!"
 }
 
-function decrypt_stdout {
-    o=$(reop -D $REOP_OPTS -x ${REPA_DB}.enc -m - || error "Can't decrypt ${REPA_DB}.enc!")
-    printf "$o"
+decrypt_stdout() {
+    o=$(reop -D $REOP_OPTS -x "${REPA_DB}.enc" -m - || error "Can't decrypt ${REPA_DB}.enc!")
+    printf "%s" "$o"
 }
 
-function dump {
+dump() {
     DB=$(decrypt_stdout)
     OIFS=$IFS
     IFS="
 "
     for line in $DB; do
-	pp $line
+	pp "$line"
     done
     IFS=$OIFS
     echo
 }
 
-function encode {
-    echo $(echo $@ | perl -MMIME::Base64 -ne 'print encode_base64($_)')
+encode() {
+    echo "$@" | perl -MMIME::Base64 -ne 'print encode_base64($_)'
 }
 
-function decode {
-    echo $(echo $@ | perl -MMIME::Base64 -ne 'print decode_base64($_)')
+decode() {
+    echo "$@" | perl -MMIME::Base64 -ne 'print decode_base64($_)'
 }
 
-function add_entry {
-    echo -n "Entry: "
-    read ENTRY
-    echo -n "Login: "
-    read LOGIN
-    echo -n "Password: "
+add_entry() {
+    printf "Entry: "
+    read -r ENTRY
+    printf "Login: "
+    read -r LOGIN
+    printf "Password: "
     stty -echo
-    read -s PASS
+    read -r PASS
     stty echo
     echo 
-    echo -n "Notes: "
-    read NOTES
+    printf "Notes: "
+    read -r NOTES
     
-    PASS=$(encode $PASS)
-    NOTES=$(encode $NOTES)
+    PASS=$(encode "$PASS")
+    NOTES=$(encode "$NOTES")
     
     entry="${ENTRY},${LOGIN},${PASS},${NOTES}"
     
     F=$(mktemp)
-    decrypt_file $F
-    echo $entry >> $F
-    encrypt $F ${REPA_DB}.enc
+    decrypt_file "$F"
+    echo "$entry" >> "$F"
+    encrypt "$F" "${REPA_DB}.enc"
 }
 
-function db_exists {
+db_exists() {
     if [ ! -f ${REPA_DB}.enc ]; then
 	error "DB ${REPA_DB}.enc doesn't exist! Plese run: '${SNAME} init'"
     fi
 }
 
-function init {
+init() {
     if [ ! -d $STORE_DIR ]; then
 	mkdir $STORE_DIR
 	chmod 700 $STORE_DIR
@@ -146,23 +145,23 @@ function init {
 	reop -G ${REOP_OPTS} || error "Can't create key pair!"
 	echo "Creating store."
 	touch $REPA_DB || error "Can't create db file!"
-	encrypt $REPA_DB
+	encrypt "$REPA_DB"
     else
 	echo "'${REPA_DB}.enc' already exists!"
 	exit 1
     fi
 }
 
-function dump_pass {
+dump_pass() {
     ENTRY=$(decrypt_stdout | grep "^${2}")
-    PASS=$(echo $ENTRY | cut -d, -f3)
-    PASS=$(decode $PASS)
-    echo $PASS
+    PASS=$(echo "$ENTRY" | cut -d, -f3)
+    PASS=$(decode "$PASS")
+    echo "$PASS"
 }
 
-function dump_entry {
+dump_entry() {
     ENTRY=$(decrypt_stdout | grep "^${2}")
-    pp $ENTRY
+    pp "$ENTRY"
 }
 
 case $1 in
@@ -175,11 +174,11 @@ case $1 in
 	;;
     pass)
 	db_exists
-	dump_pass $2
+	dump_pass "$2"
 	;;
     show)
 	db_exists
-	dump_entry $2
+	dump_entry "$2"
 	;;
     dump)
 	db_exists
